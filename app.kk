@@ -13,6 +13,9 @@ effect state
   fun fetch(k: string) : float64 // maybe<cellValue>
   fun put(k: string, v: cellValue) : ()
   fun print-spreadsheet() : ()
+
+effect commands
+  fun sum(a: string, b: string) : float64
   
 effect tasks
   fun eval(v: maybe<cellValue>) : float64
@@ -25,7 +28,11 @@ val task-handler = handler
         Float(i: float64) -> i
         Task(_) -> 0.0
 
-fun handle-app(n-rows : int, n-columns : int, action : () -> <state, console> a): <console, exn |_e> a
+val command-handler = handler
+  fun sum(a, b)
+    fetch(a) + fetch(b)
+
+pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, exn, state, commands> a): <console, exn |_e> a
   var spreadsheet := replicate(replicate(Nothing, n-columns), n-rows)
   with task-handler
   with handler
@@ -44,7 +51,6 @@ fun handle-app(n-rows : int, n-columns : int, action : () -> <state, console> a)
         Just(row : list<maybe<cellValue>>) -> match row[idx.snd]
           Nothing -> throw("Requested cell is empty")
           Just(v : maybe<cellValue>) -> eval(v)
-      
     fun print-spreadsheet()
       print("\t")
       list('A', char(int('A') + n-columns - 1)).foreach(fn (col) print(string(col) ++ "\t"))
@@ -55,13 +61,15 @@ fun handle-app(n-rows : int, n-columns : int, action : () -> <state, console> a)
         Just(l : list<maybe<cellValue>>) -> l.foreach(fn (elem) {print(eval(elem)); print("\t")})
         Nothing -> ()
       println("")
+  with command-handler
   action()
 
 fun load-spreadsheet()
   put("A1", Float(1.0))
   put("A4", Float(1.0))
   print-spreadsheet()
-  println(fetch("A4"))
+  println("Results:")
+  println(sum("A1", "A4"))
   ()
 
 fun main()
