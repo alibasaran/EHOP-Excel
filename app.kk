@@ -31,21 +31,6 @@ fun calculate-index(k: string): _e (int, int)
   val column = key-encoded.filter(fn(x) x >= 65).map(fn(x) x - 65).foldr(0, fn(x, y) 26 * x + y)
   (row, column)
 
-fun init-row(n-columns: int, row: list<maybe<cellValue>>) : _e list<maybe<cellValue>>
-  if(n-columns <= 0)
-  then row
-  else init-row(n-columns - 1, [Nothing] ++ row)
-
-fun init-spreadsheet(n-rows: int, n-columns: int, spreadsheet: list<list<maybe<cellValue>>>) : _e list<list<maybe<cellValue>>>
-  if(n-rows <= 0)
-  then spreadsheet
-  else init-spreadsheet(n-rows - 1, n-columns, [init-row(n-columns, [])] ++ spreadsheet)
-
-// fun init-spreadsheet(size: int, spreadsheet: list<maybe<cellValue>>) : _e list<maybe<cellValue>>
-//   if(size <= 0)
-//   then spreadsheet
-//   else init-spreadsheet(size - 1, [Nothing] ++ spreadsheet)
-
 val task-handler = handler
   fun eval(v)
     match v
@@ -55,7 +40,7 @@ val task-handler = handler
         Task(_) -> 0.0
 
 fun handle-app(n-rows : int, n-columns : int, action : () -> <state, console> a): <console, exn |_e> a
-  var spreadsheet := init-spreadsheet(n-rows, n-columns, [])
+  var spreadsheet := replicate(replicate(Nothing, n-columns), n-rows)
   with task-handler
   with handler
     fun put(k, v)
