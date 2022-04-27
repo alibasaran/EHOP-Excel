@@ -1,23 +1,25 @@
+module app
+
 import std/os/file
 import std/os/path
 import helpers
 
 // Idea: for calculating dependencies run tasks under different handler
 
-type cellValue
+pub type cellValue
   Float(i: float64)
   // String(s: string)
   Task(t: () -> cellValue)
 
-effect state
+pub effect state
   fun fetch(k: string) : float64 // maybe<cellValue>
   fun put(k: string, v: cellValue) : ()
   fun print-spreadsheet() : ()
 
-effect commands
+pub effect commands
   fun sum(a: string, b: string) : float64
   
-effect tasks
+pub effect tasks
   fun eval(v: maybe<cellValue>) : float64
 
 val task-handler = handler
@@ -63,6 +65,7 @@ pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, exn, 
       println("")
   with command-handler
   action()
+
 
 fun load-spreadsheet()
   put("A1", Float(1.0))
