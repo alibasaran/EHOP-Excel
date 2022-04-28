@@ -8,11 +8,14 @@ import helpers
 // Idea: for calculating dependencies run tasks under different handler
 
 pub type cell
-  Cell(t : () -> <tasks> float64)
+  Float(i: float64)
+  Task(t : () -> <tasks> float64)
 
-pub fun eval(c : cell): <tasks> float64 
+pub fun eval(c : cell): /* <tasks> */ float64 
   match c
-    Cell(t) -> t()
+    Float(i : float64) -> i
+    Task(_) -> 0.0
+    // Task(t : () -> <tasks> float64) -> t()
 
 pub effect state
   fun get(k: string) : cell
@@ -24,10 +27,9 @@ pub effect tasks
 
 val task-handler = handler
   fun fetch(k)
-    // Recursive fetch calls to evaluate a cell ex: A1 = A2 + A3 => fetch(A1) = fetch(A2) + fetch(A3), 
-    // Problem: new task affects are raised while the previous fetch is handled by task-handler
-    // Should be: eval(get(k)) 
-    0.0
+    // Need recursive fetch calls to evaluate a cell ex: A1 = A2 + A3 => fetch(A1) = fetch(A2) + fetch(A3), 
+    // Problem: new task affects are raised within the handler, while fetch is being handled, resulting in unhandled task affects
+    get(k).eval()
 
 pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, state, tasks> a) : <console, exn |_e> a
   // Initialize empty spreadsheet with Nothing
@@ -55,12 +57,11 @@ pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, state
 
 fun load-spreadsheet()
   // Example "action" that implements basic functionality 
-  put("A1", Cell(fn() 1.0))
-  put("A3", Cell(fn() 1.0))
-  // print-spreadsheet()
+  put("A1", Float(1.0))
+  put("A3", Float(1.0))
   println("Results:")
-  // put("A3", Cell(fn() {fetch("A1") + fetch("A4")}))
-  println(fetch("A3"))
+  put("A4", Task(fn() fetch("A1") + fetch("A3")))
+  println(fetch("A4"))
   ()
 
 fun main()
