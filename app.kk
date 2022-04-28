@@ -2,78 +2,92 @@ module app
 
 import std/os/file
 import std/os/path
+import std/os/readline
 import helpers
 
 // Idea: for calculating dependencies run tasks under different handler
 
-pub type cellValue
-  Float(i: float64)
-  // String(s: string)
-  Task(t: () -> cellValue)
+pub type cell
+  Cell(t : () -> <tasks> float64)
+
+pub fun eval(c : cell): <tasks> float64 
+  match c
+    Cell(t) -> t()
 
 pub effect state
-  fun fetch(k: string) : float64 // maybe<cellValue>
-  fun put(k: string, v: cellValue) : ()
-  fun print-spreadsheet() : ()
+  fun get(k: string) : cell
+  fun put(k: string, v: cell) : ()
+  // fun print-spreadsheet() : ()
 
-pub effect commands
-  fun sum(a: string, b: string) : float64
-  
 pub effect tasks
-  fun eval(v: maybe<cellValue>) : float64
+  fun fetch(k : string) : float64
 
 val task-handler = handler
-  fun eval(v)
-    match v
-      Nothing -> 0.0
-      Just(cell-val: cellValue) -> match cell-val
-        Float(i: float64) -> i
-        Task(_) -> 0.0
+  fun fetch(k)
+    // Recursive fetch calls to evaluate a cell ex: A1 = A2 + A3 => fetch(A1) = fetch(A2) + fetch(A3), 
+    // Problem: new task affects are raised while the previous fetch is handled by task-handler
+    // Should be: eval(get(k)) 
+    0.0
 
-val command-handler = handler
-  fun sum(a, b)
-    fetch(a) + fetch(b)
-
-pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, exn, state, commands> a): <console, exn |_e> a
-  var spreadsheet := replicate(replicate(Nothing, n-columns), n-rows)
-  with task-handler
+pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, state, tasks> a) : <console, exn |_e> a
+  // Initialize empty spreadsheet with Nothing
+  var spreadsheet : list<list<maybe<cell>>> := replicate(replicate(Nothing, n-columns), n-rows)
+  // State handler logic, implements put and get
   with handler
     fun put(k, v)
       val idx = calculate-index(k)
       match spreadsheet[idx.fst]
-        Nothing -> () // Expand spreadsheet
-        Just(l : list<maybe<cellValue>>) -> {
+        Nothing -> () // TODO: Expand spreadsheet
+        Just(l : list<maybe<cell>>) ->
           val row-to-append = replace-at-index(idx.snd, Just(v), l)
           spreadsheet := replace-at-index(idx.fst, row-to-append, spreadsheet)
-        }
-    fun fetch(k)
+    fun get(k)
       val idx = calculate-index(k)
       match spreadsheet[idx.fst]
         Nothing -> throw("Requested cell is empty")
-        Just(row : list<maybe<cellValue>>) -> match row[idx.snd]
+        Just(row : list<maybe<cell>>) -> match row[idx.snd]
           Nothing -> throw("Requested cell is empty")
-          Just(v : maybe<cellValue>) -> eval(v)
-    fun print-spreadsheet()
-      print("\t")
-      list('A', char(int('A') + n-columns - 1)).foreach(fn (col) print(string(col) ++ "\t"))
-      println("")
-      with x <- list(1, n-rows).foreach
-      print(x); print("\t")
-      match spreadsheet[x - 1]
-        Just(l : list<maybe<cellValue>>) -> l.foreach(fn (elem) {print(eval(elem)); print("\t")})
-        Nothing -> ()
-      println("")
-  with command-handler
+          Just(v : maybe<cell>) -> match v
+            Just(c : cell) -> c
+            Nothing -> throw("Requested cell is empty")
+  with task-handler
   action()
 
-
 fun load-spreadsheet()
-  put("A1", Float(1.0))
-  put("A4", Float(1.0))
-  print-spreadsheet()
+  // Example "action" that implements basic functionality 
+  put("A1", Cell(fn() 1.0))
+  put("A3", Cell(fn() 1.0))
+  // print-spreadsheet()
   println("Results:")
-  println(sum("A1", "A4"))
+  // put("A3", Cell(fn() {fetch("A1") + fetch("A4")}))
+  println(fetch("A3"))
   ()
 
 fun main()
-  handle-app(4, 4, load-spreadsheet)
+  handle-app(10, 10, load-spreadsheet)
+
+
+// Below are commented-out additional functionality
+
+// fun print-spreadsheet()
+//   print("\t")
+//   list('A', char(int('A') + n-columns - 1)).foreach(fn (col) print(string(col) ++ "\t"))
+//   println("")
+//   with x <- list(1, n-rows).foreach
+//   print(x); print("\t")
+//   match spreadsheet[x - 1]
+//     Just(l : list<maybe<cell>>) -> l.foreach(fn (elem) {print(elem.eval()); print("\t")})
+//     Nothing -> ()
+
+// fun app() : <state, io> ()
+//   val command-list = to-upper(readline()).split(" ")
+//   println("Result:")
+//   match command-list
+//     // What about A1 = A2?
+//     [key, "=", value] -> put(key, Float(string-to-float(value)))
+//     ["PRINT"] -> print-spreadsheet()
+//     [key] -> println(get(key))
+//     _ -> println("Invalid input")
+//   println("")
+//   app()
+
