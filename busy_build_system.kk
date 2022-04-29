@@ -29,20 +29,7 @@ pub effect tasks
 pub effect visuals
   fun print-spreadsheet() : ()
 
-pub fun evaluate-task(spreadsheet : list<list<maybe<cell>>>, action: () -> <tasks> float64) :  <exn, div> float64
-  with handler
-    // Put is not called within evaluation
-    fun put(k, v)
-      ()
-    fun get(k)
-      val idx = calculate-index(k)
-      match spreadsheet[idx.fst]
-        Nothing -> throw("Requested cell is empty")
-        Just(row : list<maybe<cell>>) -> match row[idx.snd]
-          Nothing -> throw("Requested cell is empty")
-          Just(v : maybe<cell>) -> match v
-            Just(c : cell) -> c
-            Nothing -> throw("Requested cell is empty")
+pub fun evaluate-task(spreadsheet : list<list<maybe<cell>>>, action: () -> <tasks> float64) :  <exn, div, state> float64
   with handler
     fun fetch(k)
       match get(k)
@@ -50,7 +37,7 @@ pub fun evaluate-task(spreadsheet : list<list<maybe<cell>>>, action: () -> <task
         Task(t : () -> <tasks> float64) -> evaluate-task(spreadsheet, t)
   action()
 
-pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, state, tasks, visuals> a) : <console |_e> a
+pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, state, tasks, visual> a) : <console |_e> a
   // Initialize empty spreadsheet with Nothing
   var spreadsheet : list<list<maybe<cell>>> := replicate(replicate(Nothing, n-columns), n-rows)
   // State handler logic, implements put and get
@@ -109,21 +96,19 @@ fun sandbox()
   print-spreadsheet()
   ()
 
-private fun main()
-  handle-app(4, 4, sandbox)
 
-
-// Below are commented-out additional functionality
-
-// fun app() : <state, io> ()
+// fun app() : app-effects ()
 //   val command-list = to-upper(readline()).split(" ")
 //   println("Result:")
 //   match command-list
 //     // What about A1 = A2?
 //     [key, "=", value] -> put(key, Float(string-to-float(value)))
 //     ["PRINT"] -> print-spreadsheet()
-//     [key] -> println(get(key))
+//     [key] -> println(fetch(key))
 //     _ -> println("Invalid input")
 //   println("")
 //   app()
 
+private fun main()
+  handle-app(4, 4, sandbox)
+  
