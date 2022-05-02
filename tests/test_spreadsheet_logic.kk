@@ -1,29 +1,11 @@
 import app
-import helpers
 
 fun test(res: float64, expected: float64)
-  if res != expected then {print("Failed: Expected value: ");print(expected);print(" Actual value: ");print(res);println("")}
-  else println("Test passed!")
+  if res != expected then {print("\tFailed: Expected value: ");print(expected);print(" Actual value: ");print(res);println("")}
+  else println("\tTest passed!")
 
 fun test-app(action, expected: float64)
   test(handle-app(50, 50, action), expected)
-
-fun test-idx()
-  println("Test index 1:")
-  val res = calculate-index("D4")
-  test(float64(res.fst), 3.0)
-  test(float64(res.snd), 3.0)
-
-fun test-idx2()
-  println("Test index 2:")
-  val res = calculate-index("AD1")
-  test(float64(res.fst), 0.0)
-  test(float64(res.snd), 28.0)
-
-fun test-idx3()
-  println("Test index 3:")
-  val res = calculate-index("11")
-  test(float64(res.fst), 10.0)
 
 fun test-put-fetch1()
   println("Test put and fetch:")
@@ -62,7 +44,7 @@ fun test-put-fetch-with-if-else-conditional()
     put("A4", Task(task-fun))
     fetch("A4")
   test-app(action, 3.0)
-    
+
 fun main()
   test-put-fetch1()
   test-create-task-with-sum-and-fetch()
