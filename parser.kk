@@ -22,17 +22,18 @@ pub type token
   Number(n : float64)
   Func(func-name : string, params: list<token>)
 
+pub fun print(t: token) : <console> ()
+  match t
+    Key(k : string) -> println("Key(" ++ k ++ ")")
+    Number(n : float64) -> {println("Number(");print(n);print(")")}
+    Func(func-name : string, _) -> println("Func(name=" ++ func-name ++ ")")
+
 
 pub fun print-input-list(ts : list<token>) : <div, console> ()
   with t <- ts.foreach
-  match t
-    Key(k : string) -> println(k)
-    Number(n : float64) -> println(n)
-    Func(func-name : string, params: list<token>) -> print-input-list(params)
-
+  t.print()
 
 pub fun parse-input(input : string) : <div, console, exn> list<token>
-  println(input)
   input.split(" ").map(fn(elem) {
     if elem.is-number
     then Number(string-to-float(elem))
