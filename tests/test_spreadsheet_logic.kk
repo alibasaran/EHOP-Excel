@@ -1,4 +1,4 @@
-import app
+import busy_build_system
 
 fun test(res: float64, expected: float64)
   if res != expected then {print("\tFailed: Expected value: ");print(expected);print(" Actual value: ");print(res);println("")}

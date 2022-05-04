@@ -1,9 +1,11 @@
-module app
+module busy_build_system
 
 import std/os/file
 import std/os/path
 import std/os/readline
 import helpers
+import tokenizer
+import interpreter
 
 /*
 Below is the implementation of a "busy" build system. The term is used in Build Systems à la Carte by ANDREY MOKHOV, NEIL MITCHELL, SIMON PEYTON JONES
@@ -15,60 +17,81 @@ and only if they transitively depend on inputs that changed since the previous b
 Ex. If A1 = A2 + A2 then the cell on A2 will be fetched twice, even though though in between fetchs the value of A2's dependencies did not change
 */
 
-pub type cell
-  Float(i: float64)
-  Task(t : () -> <tasks> float64)
+pub struct cell
+  cell-desc : string = ""
+  value : cell-val = Float(0.0)
+
+// All effects raised while using the app
+alias app-effects = <alloc<global>,console,div,exn,fsys,ndet,net,read<global>,state,tasks,ui,visuals,write<global>>
 
 pub effect state
-  fun get(k: string) : cell
-  fun put(k: string, v: cell) : ()
+  // Gets cell at key
+  fun get(key: string) : cell
+  // Puts value into key
+  fun put(key: string, value: cell) : ()
+
+/*
+Cell evaluation logic
+*/
 
 pub effect tasks
+  // Given a key return the value of the keys cell
   fun fetch(k : string) : float64
 
-pub effect visuals
-  fun print-spreadsheet() : ()
-
-pub fun evaluate-task(spreadsheet : list<list<maybe<cell>>>, action: () -> <tasks> float64) :  <exn, div, state> float64
+pub fun evaluate-cell-val(cv : cell-val) :  <exn, div, state> float64
+  // IMPORTANT: A helper function is needed because recursive calls to the same function cannot be made inside handlers
+  // Helper for the fetch-function, evaluates a cell-val into float
   with handler
-    fun fetch(k)
-      match get(k)
-        Float(i : float64) -> i
-        Task(t : () -> <tasks> float64) -> evaluate-task(spreadsheet, t)
-  action()
+    fun fetch(k) evaluate-cell-val(get(k).value)
+  match cv
+    Float(i : float64) -> i
+    KeyV(s : string) -> fetch(s)
+    SumV(params : list<cell-val>) -> params.foldl(0.0, fn(total, v) total + v.evaluate-cell-val)
+    MulV(params : list<cell-val>) -> params.foldl(1.0, fn(total, v) total * v.evaluate-cell-val)
+    DivV(params : list<cell-val>) -> 
+      val first-val = params[0].unjust.evaluate-cell-val
+      params.tail.foldl(first-val, fn(total, v) total / v.evaluate-cell-val)
+    MinusV(params : list<cell-val>) -> 
+      val first-val = params[0].unjust.evaluate-cell-val
+      params.tail.foldl(first-val, fn(total, v) total - v.evaluate-cell-val)
 
-pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, state, tasks, visual> a) : <console |_e> a
+/*
+  Spreadsheet or cell visualization effect
+*/
+pub effect visuals
+  // Print the full spreadsheet
+  fun print-spreadsheet() : ()
+  // Print the description of a cell
+  fun print-cell-desc(k : string) : ()
+
+pub fun handle-app(n-rows : int, n-columns : int, action : () -> app-effects a) : <console |_e> a
   // Initialize empty spreadsheet with Nothing
-  var spreadsheet : list<list<maybe<cell>>> := replicate(replicate(Nothing, n-columns), n-rows)
+  var spreadsheet : list<list<cell>> := replicate(replicate(Cell(), n-columns), n-rows)
   // State handler logic, implements put and get
   with handler
     fun put(k, v)
       val idx = calculate-index(k)
       match spreadsheet[idx.fst]
-        Nothing -> () // TODO: Expand spreadsheet
-        Just(l : list<maybe<cell>>) ->
-          val row-to-append = replace-at-index(idx.snd, Just(v), l)
+        Nothing -> println(k ++ "is out of the spreadsheet boundary")
+        Just(l : list<cell>) ->
+          val row-to-append = replace-at-index(idx.snd, v, l)
           spreadsheet := replace-at-index(idx.fst, row-to-append, spreadsheet)
     fun get(k)
       val idx = calculate-index(k)
       match spreadsheet[idx.fst]
-        Nothing -> Float(0.0)
-        Just(row : list<maybe<cell>>) -> match row[idx.snd]
-          Nothing -> Float(0.0)
-          Just(v : maybe<cell>) -> match v
-            Just(c : cell) -> c
-            Nothing -> Float(0.0)
+        Nothing -> Cell()
+        Just(row : list<cell>) -> match row[idx.snd]
+          Nothing -> Cell()
+          Just(v : cell) -> v
   // Task handler logic, evaluates the value of a task using evaluate-task helper method
   with handler
-    fun fetch(k)
-      // Need recursive fetch calls to evaluate a cell ex: A1 = A2 + A3 => fetch(A1) = fetch(A2) + fetch(A3), 
-      // [SOLVED] Problem: new task affects are raised within the handler, while fetch is being handled, resulting in unhandled task affects
-      // [TODO] New problem: find a way to avoid handler logic repetition
-      match get(k)
-        Float(i : float64) -> i
-        Task(t : () -> <tasks> float64) -> evaluate-task(spreadsheet, t)
+    fun fetch(k) evaluate-cell-val(get(k).value)
   // Visual logic
   with handler
+    // Prints the description used to evaluate a cell. Ex. A cells desciption could be SUM(A1,A2)
+    fun print-cell-desc(k)
+      get(k).cell-desc.println()
+    // Prints the full spreadsheet
     fun print-spreadsheet()
       print("\t")
       val columns = list('A', char(int('A') + n-columns - 1))
@@ -80,35 +103,28 @@ pub fun handle-app(n-rows : int, n-columns : int, action : () -> <console, state
       println("")
   action()
 
-fun sandbox()
-  // Example "action" that implements basic functionality 
-  put("A1", Float(1.0))
-  put("A3", Float(2.0))
-  put("C4", Float(1.0))
-  println("Results:")
-  val task-fun = fn() {
-    if fetch("C4") == 1.0
-    then fetch("A1") + fetch("A3")
-    else fetch("A3")
-  }
-  put("A4", Task(task-fun))
-  // println(fetch("A4"))
-  print-spreadsheet()
-  ()
+pub fun handle-command(command : string) : app-effects ()
+  // Seperate command handling to a separate function for simpler test code
+  match command.split(" ")
+    // When assigning a new value to a key
+    [key, "=", value] -> {
+      // Check if key is valid.
+      if key.is-key
+      then put(key, Cell(value, tokenize-string(value)[0].unjust.interpret-token))
+      else println("Invalid key format: " ++ key)
+    }
+    ["PRINT"] -> print-spreadsheet()
+    [key] -> if key.is-key then println(fetch(key)) else println("Invalid key format: " ++ key)
+    ["DESC", key] -> print-cell-desc(key)
+    _ -> println("Invalid input")
 
+fun app() : app-effects ()
+  print("<App Name>$ ")
+  val command = to-upper(readline())
+  handle-command(command)
+  println("")
+  app()
 
-// fun app() : app-effects ()
-//   val command-list = to-upper(readline()).split(" ")
-//   println("Result:")
-//   match command-list
-//     // What about A1 = A2?
-//     [key, "=", value] -> put(key, Float(string-to-float(value)))
-//     ["PRINT"] -> print-spreadsheet()
-//     [key] -> println(fetch(key))
-//     _ -> println("Invalid input")
-//   println("")
-//   app()
-
-private fun main()
-  handle-app(4, 4, sandbox)
+fun main()
+  handle-app(9, 9, app)
   

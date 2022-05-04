@@ -1,5 +1,7 @@
 module helpers
 
+import std/text/regex
+
 /*
 Helper functions
 */
@@ -27,3 +29,15 @@ pub fun calculate-index(k: string): _e (int, int)
   val row = key-encoded.filter(fn(x) x <= 57 && x >= 49).map(fn(x) x - 48).foldl(0, fn(x, y) 10 * x + y)
   val column = key-encoded.filter(fn(x) x > 64).map(fn(x) x - 64).foldl(0, fn(x, y) 25 * x + y)
   (row - 1, column - 1)
+
+pub fun replace-top-level-comma-with-space(s : string) : string
+  /*
+  Replaces top level comma with a space
+  Ex. "SUM(A1, A2),SUM(A1, A2)" => "SUM(A1,A2) SUM(A1,A2)"
+  */
+  s.split(regex(",(?![^(]*\\))")).foldl("", 
+    fn (b, a)
+      if a.count("(") > a.count(")")
+      then b ++ a ++ ","
+      else b ++ a ++ " "
+  )
