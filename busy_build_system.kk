@@ -21,14 +21,32 @@ pub struct cell
   cell-desc : string = ""
   value : cell-val = Float(0.0)
 
-// All effects raised while using the app
-alias app-effects = <alloc<global>,console,div,exn,fsys,ndet,net,read<global>,state,tasks,ui,visuals,write<global>>
-
 pub effect state
   // Gets cell at key
   fun get(key: string) : cell
   // Puts value into key
   fun put(key: string, value: cell) : ()
+
+pub fun spreadsheet-handler(n-rows : int, n-columns : int, action : () -> <state,console,div|e> a) : <div,console|e> a
+  // Initialize empty spreadsheet with Nothing
+  var spreadsheet : list<list<cell>> := replicate(replicate(Cell(), n-columns), n-rows)
+  // State handler logic, implements put and get
+  with handler
+    fun put(k, v)
+      val idx = calculate-index(k)
+      match spreadsheet[idx.fst]
+        Nothing -> println(k ++ "is out of the spreadsheet boundary")
+        Just(l : list<cell>) ->
+          val row-to-append = replace-at-index(idx.snd, v, l)
+          spreadsheet := replace-at-index(idx.fst, row-to-append, spreadsheet)
+    fun get(k)
+      val idx = calculate-index(k)
+      match spreadsheet[idx.fst]
+        Nothing -> Cell()
+        Just(row : list<cell>) -> match row[idx.snd]
+          Nothing -> Cell()
+          Just(v : cell) -> v
+  action()
 
 /*
 Cell evaluation logic
@@ -38,11 +56,15 @@ pub effect tasks
   // Given a key return the value of the keys cell
   fun fetch(k : string) : float64
 
-pub fun evaluate-cell-val(cv : cell-val) :  <exn, div, state> float64
+fun task-handler(action : () -> <state,tasks,exn,console,div|e> a) : <state,console,div,exn|e> a
+  with handler
+    fun fetch(k) get(k).value.evaluate-cell-val
+  action()
+
+pub fun evaluate-cell-val(cv : cell-val) :  <exn, div, console, state> float64
   // IMPORTANT: A helper function is needed because recursive calls to the same function cannot be made inside handlers
   // Helper for the fetch-function, evaluates a cell-val into float
-  with handler
-    fun fetch(k) evaluate-cell-val(get(k).value)
+  with task-handler()
   match cv
     Float(i : float64) -> i
     KeyV(s : string) -> fetch(s)
@@ -64,31 +86,9 @@ pub effect visuals
   // Print the description of a cell
   fun print-cell-desc(k : string) : ()
 
-pub fun handle-app(n-rows : int, n-columns : int, action : () -> app-effects a) : <console |_e> a
-  // Initialize empty spreadsheet with Nothing
-  var spreadsheet : list<list<cell>> := replicate(replicate(Cell(), n-columns), n-rows)
-  // State handler logic, implements put and get
+pub fun visuals-handler(n-rows : int, n-columns : int, action : () -> <visuals,state,tasks,console|e> a) : <state,tasks,console|e> a
   with handler
-    fun put(k, v)
-      val idx = calculate-index(k)
-      match spreadsheet[idx.fst]
-        Nothing -> println(k ++ "is out of the spreadsheet boundary")
-        Just(l : list<cell>) ->
-          val row-to-append = replace-at-index(idx.snd, v, l)
-          spreadsheet := replace-at-index(idx.fst, row-to-append, spreadsheet)
-    fun get(k)
-      val idx = calculate-index(k)
-      match spreadsheet[idx.fst]
-        Nothing -> Cell()
-        Just(row : list<cell>) -> match row[idx.snd]
-          Nothing -> Cell()
-          Just(v : cell) -> v
-  // Task handler logic, evaluates the value of a task using evaluate-task helper method
-  with handler
-    fun fetch(k) evaluate-cell-val(get(k).value)
-  // Visual logic
-  with handler
-    // Prints the description used to evaluate a cell. Ex. A cells desciption could be SUM(A1,A2)
+    // Prints the cell description
     fun print-cell-desc(k)
       get(k).cell-desc.println()
     // Prints the full spreadsheet
@@ -103,7 +103,16 @@ pub fun handle-app(n-rows : int, n-columns : int, action : () -> app-effects a) 
       println("")
   action()
 
-pub fun handle-command(command : string) : app-effects ()
+pub fun handle-app(n-rows : int, n-columns : int, action : () -> <state,tasks,visuals|_e> a) : _e a
+  /*
+    Handle application operations by combining all of the handlers defined above 
+  */
+  with spreadsheet-handler(n-rows, n-columns)
+  with task-handler()
+  with visuals-handler(n-rows, n-columns)
+  action()
+
+pub fun handle-command(command : string) : <state,tasks,visuals|_e> ()
   // Seperate command handling to a separate function for simpler test code
   match command.split(" ")
     // When assigning a new value to a key
@@ -118,10 +127,9 @@ pub fun handle-command(command : string) : app-effects ()
     ["DESC", key] -> print-cell-desc(key)
     _ -> println("Invalid input")
 
-fun app() : app-effects ()
+fun app() : <state,tasks,visuals|_e> ()
   print("<App Name>$ ")
-  val command = to-upper(readline())
-  handle-command(command)
+  readline().to-upper().handle-command
   println("")
   app()
 

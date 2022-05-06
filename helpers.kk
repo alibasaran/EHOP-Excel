@@ -30,7 +30,7 @@ pub fun calculate-index(k: string): _e (int, int)
   val column = key-encoded.filter(fn(x) x > 64).map(fn(x) x - 64).foldl(0, fn(x, y) 25 * x + y)
   (row - 1, column - 1)
 
-pub fun replace-top-level-comma-with-space(s : string) : string
+pub fun replace-top-level-comma-with-space(s : string) : _e string
   /*
   Replaces top level comma with a space
   Ex. "SUM(A1, A2),SUM(A1, A2)" => "SUM(A1,A2) SUM(A1,A2)"

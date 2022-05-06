@@ -62,14 +62,14 @@ pub fun tokenize-string(input : string) : <div, console, exn> list<token>
 
 // Below are token printing functionality used in development
 
-pub fun print(t: token) : <console, div> ()
-  match t
-    Key(k : string) -> println("Key(" ++ k ++ ")")
-    Number(n : float64) -> {print("Number(");print(n);print(")");println("")}
-    Func(func-name : string, params : list<token>) -> 
-      println("Func(name=" ++ func-name ++ ")")
-      print-input-list(params)
+// pub fun print(t: token) : <console, div> ()
+//   match t
+//     Key(k : string) -> println("Key(" ++ k ++ ")")
+//     Number(n : float64) -> {print("Number(");print(n);print(")");println("")}
+//     Func(func-name : string, params : list<token>) -> 
+//       println("Func(name=" ++ func-name ++ ")")
+//       print-input-list(params)
 
-pub fun print-input-list(ts : list<token>) : <div, console> ()
-  with t <- ts.foreach
-  t.print()
+// pub fun print-input-list(ts : list<token>) : <div, console> ()
+//   with t <- ts.foreach
+//   t.print()

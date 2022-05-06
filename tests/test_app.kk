@@ -95,7 +95,7 @@ fun tests()
   test_div()
   test_minus()
   test_mixed_nested_funcs()
-  // test-cell-desc()
+  test-cell-desc()
 
 fun main()
   handle-app(9, 9, tests)
