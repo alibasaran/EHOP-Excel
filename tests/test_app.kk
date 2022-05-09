@@ -1,5 +1,6 @@
 import std/text/regex
-import busy_build_system
+// import iteration1/busy_build_system
+import iteration2/better_build_system
 
 
 fun test(commands : list<string>, expected: string, test-name : string)
@@ -86,16 +87,17 @@ fun test-cell-desc()
   test(test-input, "SUM(MUL(A1,10),SUM(MINUS(B1,1),C1))", "Test cell desc")
 
 
-fun tests()
-  test_fetch_key()
-  test_fun()
-  test_nested_fun()
-  test_triple_nested_fun()
-  test_both_params_fun()
-  test_div()
-  test_minus()
-  test_mixed_nested_funcs()
-  test-cell-desc()
+val tests = [
+  test_fetch_key,
+  test_fun,
+  test_nested_fun,
+  test_triple_nested_fun,
+  test_both_params_fun,
+  test_div,
+  test_minus,
+  test_mixed_nested_funcs,
+  test-cell-desc
+]
 
 fun main()
-  handle-app(9, 9, tests)
+  tests.foreach(fn (t) handle-app(9, 9, t))
