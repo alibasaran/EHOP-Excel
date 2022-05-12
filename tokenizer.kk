@@ -1,5 +1,6 @@
 module tokenizer
 import std/text/regex
+import std/num/decimal
 import helpers
 
 // Regex used to extract certain strings from user command input
@@ -10,14 +11,9 @@ val key-regex = regex("^[A-Z]+[0-9]+$")
 
 pub type token
   Key(k : string)
-  Number(n : float64)
+  Number(n : decimal)
   Func(func-name : string, params: list<token>)
 
-// effect tokenize
-//   fun is-func(s : string) : bool
-//   fun is-key(s : string) : bool
-//   fun is-number(s : string) : bool
-//   fun tokenize-string(s : string) : list<token>
 
 pub fun is-func(s : string) : bool
   /*
@@ -47,7 +43,7 @@ pub fun tokenize-string(input : string) : <div, console, exn> list<token>
   */
   input.split(" ").filter(fn(elem) elem != "").map(fn(elem) {
     if elem.is-number
-    then Number(string-to-float(elem))
+    then Number(string-to-decimal(elem))
     else if elem.is-key
     then Key(elem)
     else if elem.is-func

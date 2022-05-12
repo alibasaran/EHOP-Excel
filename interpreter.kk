@@ -1,8 +1,9 @@
 module interpreter
 import tokenizer
+import std/num/decimal
 
 pub type cell-val
-  Float(i : float64)
+  Decimal(i : decimal)
   KeyV(s : string)
   SumV(params : list<cell-val>)
   MulV(params : list<cell-val>)
@@ -12,7 +13,7 @@ pub type cell-val
 pub fun interpret-token(t : token) : <exn,div> cell-val
   match t
     Key(k: string) -> KeyV(k)
-    Number(n: float64) -> Float(n)
+    Number(n: decimal) -> Decimal(n)
     Func(func-name: string, params : list<token>) -> 
       val params_as_values = params.map(interpret-token)
       match func-name

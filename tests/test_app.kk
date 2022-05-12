@@ -100,4 +100,4 @@ val tests = [
 ]
 
 fun main()
-  tests.foreach(fn (t) handle-app(9, 9, t))
+  tests.foreach(fn (t) handle-app(t))
