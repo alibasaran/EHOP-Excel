@@ -24,9 +24,7 @@ pub effect debug
 
 pub fun debug-handler(debug=False,action : () -> <debug|_e> a) : _e a
   with handler
-    fun out(s)
-      if debug then println(s)
-      else ()
+    fun out(s) if debug then println(s)else ()
   action()
 /*
   Spreadsheet logic, implemented as a bucketed hash table.
@@ -82,10 +80,10 @@ pub fun fetch-cell-val-helper(cv : cell-val) : <exn, div, tasks, console> decima
     SumV(params : list<cell-val>) -> params.foldl(decimal(0.0), fn(total, v) total + v.fetch-cell-val-helper)
     MulV(params : list<cell-val>) -> params.foldl(decimal(1.0), fn(total, v) total * v.fetch-cell-val-helper)
     DivV(params : list<cell-val>) -> 
-      val first-val = params[0].unjust.fetch-cell-val-helper
+      val first-val = params.head.unjust.fetch-cell-val-helper
       params.tail.foldl(first-val, fn(total, v) total / v.fetch-cell-val-helper)
     MinusV(params : list<cell-val>) -> 
-      val first-val = params[0].unjust.fetch-cell-val-helper
+      val first-val = params.head.unjust.fetch-cell-val-helper
       params.tail.foldl(first-val, fn(total, v) total - v.fetch-cell-val-helper)
 
 /*
