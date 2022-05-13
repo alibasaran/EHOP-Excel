@@ -39,15 +39,18 @@ pub struct cell
 pub effect state
   fun set-key(k : string, v : cell) : () 
   fun get(k : string) : cell
+  fun get-nonempty-keys() : list<string>
 
 pub fun spreadsheet-handler(action : () -> <state,debug|_e> a) : <debug|_e> a
   var sprsh := hashtable()
   with handler
     fun set-key(k, v)
-      out("Set called with key: " ++ k ++ ", value: " ++ v.cell-desc)
+      out("SET key: " ++ k ++ ", value: " ++ v.cell-desc)
       sprsh := sprsh.set(k, v)
+    fun get-nonempty-keys()
+      sprsh.keys()
     fun get(k)
-      out("Get called on key: " ++ k)
+      out("GET key: " ++ k)
       match sprsh.get(k)
         Nothing -> Cell()
         Just(c : cell) -> c
@@ -62,12 +65,13 @@ pub effect tasks
 
 fun task-handler(action : () -> <tasks,state,debug|_e> a) : <state,debug|_e> a
   with handler
-    fun fetch(k) get(k).value.fetch-cell-val
+    fun fetch(k)
+     val res = get(k).value.fetch-cell-val
+     out("FETCH key: " ++ k ++ " result " ++ res.show())
+     res
   action()
 
 pub fun fetch-cell-val(cv : cell-val) :  <exn, div, console, debug, state> decimal
-  // IMPORTANT: A helper function is needed because recursive calls to the same function cannot be made inside handlers
-  // Helper for the fetch-function, evaluates a cell-val into float
   with task-handler()
   fetch-cell-val-helper(cv)
 
@@ -101,7 +105,6 @@ pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
   var is-dirty-map : hashtable<bool> := hashtable()
   with handler
     fun put(k, v)
-      out("Put " ++ k ++ " as " ++ v.cell-desc)
       v.value.calculate-dependencies.foreach(fn (dep)
         match dep-map.get(dep)
           // If initial entry of dep
@@ -109,12 +112,8 @@ pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
           // If dep already in dep-map
           Just(deps : list<string>) -> if deps.index-of(fn(e) e == k) == -1 then dep-map := dep-map.set(dep, deps ++ [k])
       )
-      // Dirty all cells dependent to k T
-      match dep-map.get(k)
-        Nothing -> ()
-        Just(deps : list<string>) -> deps.foreach(fn(dep) is-dirty-map := is-dirty-map.set(dep, True))
-      // Set initial key that we put to True
-      is-dirty-map := is-dirty-map.set(k, True)
+      // Dirty all cells dependent to k T as well as k
+      dep-map.get-keys-to-dirty(k).foreach(fn (dk) is-dirty-map := is-dirty-map.set(dk, True))
       // Put k,v pair into the spreadsheet
       set-key(k, v)
     fun clean(k)
@@ -134,10 +133,17 @@ pub fun calculate-dependencies(cv : cell-val) : <exn, div | _e> list<string>
   var deps := []
   with handler
     fun fetch(k)
-      deps := deps ++ [k]
+      deps := deps ++ [k] 
       decimal(1.0)
   fetch-cell-val-helper(cv)
   deps
+
+pub fun get-keys-to-dirty(dep-map : hashtable<list<string>>, dirty-key : string) : <div, exn> list<string> 
+  var res : list<string> := [dirty-key]
+  match dep-map.get(dirty-key) 
+    Nothing -> ()
+    Just(deps : list<string>) -> deps.foreach(fn(dep) res := res ++ dep-map.get-keys-to-dirty(dep))
+  res
 
 /*
   Cell building logic, optimized
@@ -145,33 +151,36 @@ pub fun calculate-dependencies(cv : cell-val) : <exn, div | _e> list<string>
 
 pub effect build
   fun eval(k : string) : decimal
-  fun get-nonempty-cells() : list<string>
 
 pub fun rebuild-handler(action : () -> <build|_e> a) : _e a
   var value-map : hashtable<decimal> := hashtable()
   with handler
     fun eval(key)
       out("Eval called with " ++ key)
-      with handler
-        fun fetch(k)
-          if !is-dirty(k)
-          then 
-            out(k ++ " is clean")
-            match value-map.get(k)
-              Nothing -> decimal(0.0)
-              Just(v : decimal) -> v
-          else
-            out(k ++ " is dirty")
-            val res = fetch(k)
-            value-map := value-map.set(k, res)
-            clean(k)
-            res
-      val res = fetch-cell-val-helper(get(key).value)
-      value-map := value-map.set(key, res)
-      clean(key)
-      res
-    fun get-nonempty-cells()
-      value-map.keys()
+      if !is-dirty(key) then 
+        out(key ++ " is clean")
+        match value-map.get(key)
+          Nothing -> decimal(0.0)
+          Just(v : decimal) -> v
+      else
+        out(key ++ " is dirty")
+        with handler
+          fun fetch(k)
+            if !is-dirty(k) then 
+              out(k ++ " is clean")
+              match value-map.get(k)
+                Nothing -> decimal(0.0)
+                Just(v : decimal) -> v
+            else
+              out(k ++ " is dirty")
+              val res = fetch(k)
+              value-map := value-map.set(k, res)
+              clean(k)
+              res
+        val res = get(key).value.fetch-cell-val-helper()
+        clean(key)
+        value-map := value-map.set(key, res)
+        res
   action()
 
 /*
@@ -193,7 +202,7 @@ pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
       get(k).cell-desc
     // Prints the full spreadsheet
     fun print-spreadsheet()
-      val non-empty-cells = get-nonempty-cells()
+      val non-empty-keys = get-nonempty-keys()
       var out-str := "\t"
       columns.foreach(fn (col) out-str := out-str ++ string(col) ++ "\t")
       out-str := out-str ++ "\n"
@@ -201,8 +210,8 @@ pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
         out-str := out-str ++ row.string ++ "\t"
         columns.foreach(fn(col) 
           val key-to-eval = col.string ++ row.string
-          if non-empty-cells.index-of(fn(e) e == key-to-eval) != -1
-          then out-str := out-str ++ eval(key-to-eval).show(3) ++ "\t"
+          if non-empty-keys.index-of(fn(e) e == key-to-eval) != -1
+          then out-str := out-str ++ eval(key-to-eval).show(-3) ++ "\t"
           else out-str := out-str ++ "-\t"
         )
         out-str := out-str ++ "\n"
@@ -223,8 +232,12 @@ pub fun handle-app(action : () -> <debug,state,tasks,dirty-bit,build,visuals|_e>
   action()
 
 pub fun handle-command(command : string) : <debug,state,tasks,dirty-bit,build,visuals|_e> string
-  var res-str : string := "" 
+  var res-str : string := command ++ "\n" 
   // Seperate command handling to a separate function for simpler test code
+  with handler
+    ctl throw-exn(e)
+      res-str := e.show()
+      res-str
   match command.split(" ")
     // Commands that are useful for testing
     ["DEPENDENCIES", k] -> 
@@ -233,12 +246,12 @@ pub fun handle-command(command : string) : <debug,state,tasks,dirty-bit,build,vi
     [key, "=", value] -> {
       // Check if key is valid.
       if key.is-key
-      then {put(key, Cell(value, tokenize-string(value)[0].unjust.interpret-token));eval(key);()}
+      then {put(key, Cell(value, tokenize-string(value)[0].unjust.interpret-token))}
       else res-str := "Invalid key format: " ++ key
     }
     ["DESC", key] -> res-str := print-cell-desc(key)
     ["PRINT"] -> res-str := print-spreadsheet()
-    [key] -> if key.is-key then res-str := eval(key).show(4) else res-str := "Invalid key format: " ++ key
+    [key] -> if key.is-key then res-str := res-str ++ eval(key).show(-3) ++ "\n" else res-str := "Invalid key format: " ++ key
     _ -> res-str := "Invalid input"
   res-str
 
@@ -251,5 +264,5 @@ fun app() : <debug,state,tasks,dirty-bit,build,visuals|_e> ()
   app()
 
 fun main()
-  handle-app(app)
+  handle-app(app, False)
   

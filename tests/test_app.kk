@@ -4,8 +4,9 @@ import iteration2/better_build_system
 
 
 fun test(commands : list<string>, expected: string, test-name : string)
-  print(test-name ++ ": ")
-  commands.foreach(fn(command) handle-command(command.to-upper()))
+  println("===================")
+  print(test-name ++ ": \n")
+  commands.foreach(fn(command) ("\t" ++ handle-command(command.to-upper())).println)
   println("Expected: " ++ expected ++ "\n")
 
 fun test_fetch_key()

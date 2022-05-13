@@ -5,7 +5,7 @@ import iteration2/better_build_system
 
 fun test(commands : list<string>, expected: string, test-name : string)
   print(test-name ++ ": \n")
-  commands.foreach(fn(command) handle-command(command.to-upper()))
+  commands.foreach(fn(command) handle-command(command.to-upper()).println)
   println("Expected: " ++ expected ++ "\n")
 
 fun test-no-deps()
@@ -131,4 +131,4 @@ val tests = [
 
 fun main()
   println("Final printed value is the output")
-  tests.foreach(fn (t) handle-app(9, 9, t))
+  tests.foreach(fn (t) handle-app(t, False))
