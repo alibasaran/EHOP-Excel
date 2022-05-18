@@ -9,43 +9,44 @@ pub struct node<a>
   key : string
   item : a
   
-pub alias hashtable<a> = vector<list<node<a>>>
+pub alias hashtable<a> = forall<h :: H> local-var<h,vector<list<node<a>>>>
 
 val num-buckets = 16
 
-pub fun hashtable<a>() : hashtable<a>
-  vector(num-buckets, [])
+pub fun hashtable<a>()
+  vector(num-buckets, []).local-new()
 
-pub fun get(hashtable : hashtable<a>, k : string) : _e maybe<a>
+pub fun get(hashtable : hashtable<a>, k : string) : <exn> maybe<a>
   val bucket-idx = bad-hash(k) % (num-buckets - 1)
-  val curr-bucket = hashtable[bucket-idx]
+  val curr-bucket = (hashtable.local-get())[bucket-idx]
   match curr-bucket.find(fn (n) n.key == k)
     Nothing -> Nothing
     Just(n) -> Just(n.item)
 
-pub fun set(hashtable : hashtable<a>, k : string, v : a) : _e hashtable<a>
-  var hashtable-local := hashtable.local-new()
-  val bucket-idx = bad-hash(k) % 15
-  var curr-bucket := hashtable[bucket-idx]
-  val item-idx = curr-bucket.index-of(fn(n) n.key == k)
+pub fun set(hashtable : hashtable<a>, k : string, v : a) : <div, exn>()
+  val bucket-idx : int = bad-hash(k) % 15
+  val curr-bucket = (hashtable.local-get())[bucket-idx]
+  val item-idx :int = curr-bucket.index-of(fn(n) n.key == k)
   if item-idx == -1
-  then hashtable-local[bucket-idx, curr-bucket ++ [Node(k, v)]] // replace-at-index(bucket-idx, curr-bucket ++ [Node(k, v)], hashtable).vector
-  else hashtable-local[bucket-idx, replace-at-index(item-idx, Node(k, v), curr-bucket)]
-  hashtable-local.local-get()
+  then hashtable[bucket-idx, curr-bucket ++ [Node(k, v)]] // replace-at-index(bucket-idx, curr-bucket ++ [Node(k, v)], hashtable).vector
+  else hashtable[bucket-idx, replace-at-index(item-idx, Node(k, v), curr-bucket)]
 
-pub fun keys(hashtable : hashtable<a>) : _e list<string>
+pub fun keys(hashtable : hashtable<a>) : <div> list<string> 
   var res : list<string> := []
-  hashtable.foreach(fn (bucket) bucket.foreach(fn(node) res := res ++ [node.key]))
+  hashtable.local-get().foreach(fn (bucket) bucket.foreach(fn(node) res := res ++ [node.key]))
   res
 
 pub fun bad-hash(s : string) : int
   // TODO: Find better hash implementation
   s.list.foldl(0, fn(total, elem) total + int(elem))
 
-// fun main()
-//   var table := hashtable()
-//   table := table.set("A2", 4)
-//   table := table.set("A1", 4)
-//   table := table.set("A4", 4)
-//   table := table.set("Z2", 4)
-//   table.keys.foreach(println)
+fun main()
+  val table : hashtable<int> = hashtable()
+  table.set("A2", 1)
+  table.set("A1", 2)
+  table.set("A4", 3)
+  table.set("Z2", 4)
+  table.keys.foreach( fn (key)
+    table.set(key, 1)
+  )
+  table.keys.foreach(fn(k) table.get(k).unjust.println)
