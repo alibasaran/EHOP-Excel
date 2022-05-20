@@ -197,7 +197,7 @@ pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
     var columns : list<char> := list('A', 'H').map(string)
     var rows : list<char> := list('1', '9').map(string)
   */
-  val columns : list<string> = list('A', 'H').map(string)
+  val columns : list<string> = list('A', 'H').map(string)t
   val rows : list<string> = list('1', '9').map(string)
   with handler
     // Prints the cell description
