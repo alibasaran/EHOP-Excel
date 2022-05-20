@@ -26,10 +26,10 @@ pub fun debug-handler(debug=False,action : () -> <debug|_e> a) : _e a
   with handler
     fun out(s) if debug then println(s)else ()
   action()
+
 /*
   Spreadsheet logic, implemented as a bucketed hash table.
 */
-
 pub struct cell
   cell-desc : string = ""
   value : cell-val = Decimal(decimal(0.0))
@@ -64,9 +64,7 @@ pub effect tasks
 fun task-handler(action : () -> <tasks,state,debug|_e> a) : <state,debug|_e> a
   with handler
     fun fetch(k)
-     val res = get(k).value.fetch-cell-val
-     out("FETCH key: " ++ k ++ " result " ++ res.show())
-     res
+      get(k).value.fetch-cell-val
   action()
 
 pub fun fetch-cell-val(cv : cell-val) :  <exn, div, console, debug, state> decimal
@@ -154,7 +152,6 @@ pub fun rebuild-handler(action : () -> <build|_e> a) : _e a
   var value-map : hashtable<decimal> := hashtable()
   with handler
     fun eval(key)
-      out("Eval called with " ++ key)
       if !is-dirty(key) then 
         out(key ++ " is clean")
         match value-map.get(key)
@@ -165,17 +162,17 @@ pub fun rebuild-handler(action : () -> <build|_e> a) : _e a
         with handler
           fun fetch(k)
             if !is-dirty(k) then 
-              out(k ++ " is clean")
               match value-map.get(k)
                 Nothing -> decimal(0.0)
                 Just(v : decimal) -> v
             else
-              out(k ++ " is dirty")
               val res = fetch(k)
+              out("FETCH key: " ++ k ++ " result " ++ res.show())
               value-map := value-map.set(k, res)
               clean(k)
               res
-        val res = get(key).value.fetch-cell-val-helper()
+        val res = get(key).value.fetch-cell-val-helper
+        out("FETCH key: " ++ key ++ " result " ++ res.show())
         clean(key)
         value-map := value-map.set(key, res)
         res
@@ -189,11 +186,19 @@ pub effect visuals
   fun print-spreadsheet() : string
   // Print the description of a cell
   fun print-cell-desc(k : string) : string
+  // Change the dimensions of the spreadsheet
+  fun change-spreadsheet-dimensions(n-rows : int, n-cols : int) : ()
 
 pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
-   //var keys-to-print : list<string> := []
-  val columns = list('A', 'H')
-  val rows = list('1', '9')
+  /*
+    Problem: Works when columns and rows are initialized with val, but not with var
+    Raises error: abstract type(s) escape(s) into the context
+    
+    var columns : list<char> := list('A', 'H').map(string)
+    var rows : list<char> := list('1', '9').map(string)
+  */
+  val columns : list<string> = list('A', 'H').map(string)
+  val rows : list<string> = list('1', '9').map(string)
   with handler
     // Prints the cell description
     fun print-cell-desc(k)
@@ -202,12 +207,12 @@ pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
     fun print-spreadsheet()
       val non-empty-keys = get-nonempty-keys()
       var out-str := "\t"
-      columns.foreach(fn (col) out-str := out-str ++ string(col) ++ "\t")
+      columns.foreach(fn (col) out-str := out-str ++ col ++ "\t")
       out-str := out-str ++ "\n"
       rows.foreach(fn (row) 
-        out-str := out-str ++ row.string ++ "\t"
+        out-str := out-str ++ row ++ "\t"
         columns.foreach(fn(col) 
-          val key-to-eval = col.string ++ row.string
+          val key-to-eval = col ++ row
           if non-empty-keys.index-of(fn(e) e == key-to-eval) != -1
           then out-str := out-str ++ eval(key-to-eval).show(-3) ++ "\t"
           else out-str := out-str ++ "-\t"
@@ -215,6 +220,10 @@ pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
         out-str := out-str ++ "\n"
       )
       out-str
+    fun change-spreadsheet-dimensions(n-rows, n-cols)
+      println(n-rows.show ++ " " ++ n-cols.show())
+      // columns := list('A', ('A'.int + n-cols).char).map(string)
+      // rows := list(1, n-cols + 1).map(fn (row-int) row-int.show())
   action()
 
 pub fun handle-app(action : () -> <debug,state,tasks,dirty-bit,build,visuals|_e> a, debug=False) : _e a
@@ -237,6 +246,14 @@ pub fun handle-command(command : string) : <debug,state,tasks,dirty-bit,build,vi
       res-str := e.show()
       res-str
   match command.split(" ")
+    ["CHANGE-DIMS", n-rows-str, n-cols-str] -> {
+      val n-cols = string-to-decimal(n-cols-str).int
+      val n-rows = string-to-decimal(n-rows-str).int
+      if n-cols < 1 || n-cols > 25
+      then println("Specified number of calls is out of the valid range: " ++ "1 < " ++ n-cols.show() ++ " < 26 is not true\n fitting specified value in the dimension range...")
+      val sanitized-n-cols = n-cols.max(1).min(25)
+      change-spreadsheet-dimensions(n-rows, n-cols)
+    }
     // Commands that are useful for testing
     ["DEPENDENCIES", k] -> 
       get(k).value.calculate-dependencies.foreach(fn(dep)res-str := res-str ++ dep ++ " ")
@@ -262,5 +279,5 @@ fun app() : <debug,state,tasks,dirty-bit,build,visuals|_e> ()
   app()
 
 fun main()
-  handle-app(app, False)
+  handle-app(app, True)
   
