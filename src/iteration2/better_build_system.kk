@@ -4,9 +4,9 @@ import std/os/file
 import std/os/path
 import std/num/decimal
 import std/os/readline
-import helpers
-import tokenizer
-import interpreter
+import src/helpers
+import src/tokenizer
+import src/interpreter
 import hashtable
 
 /*
@@ -197,7 +197,7 @@ pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
     var columns : list<char> := list('A', 'H').map(string)
     var rows : list<char> := list('1', '9').map(string)
   */
-  val columns : list<string> = list('A', 'H').map(string)t
+  val columns : list<string> = list('A', 'H').map(string)
   val rows : list<string> = list('1', '9').map(string)
   with handler
     // Prints the cell description
@@ -279,5 +279,5 @@ fun app() : <debug,state,tasks,dirty-bit,build,visuals|_e> ()
   app()
 
 fun main()
-  handle-app(app, True)
+  handle-app(app, False)
   

@@ -1,5 +1,5 @@
 module hashtable
-import helpers
+import src/helpers
 
 /*
  Bucketed hashtable implemetation
