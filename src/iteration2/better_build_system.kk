@@ -39,7 +39,7 @@ pub effect state
   fun get(k : string) : cell
   fun get-nonempty-keys() : list<string>
 
-pub fun spreadsheet-handler(action : () -> <state,debug|_e> a) : <debug|_e> a
+pub fun spreadsheet-handler(action : () -> <state|_e> a) : _e a
   var sprsh := hashtable()
   with handler
     fun set-key(k, v)
@@ -61,7 +61,7 @@ pub effect tasks
   // Given a key return the value of the keys cell
   fun fetch(k : string) : decimal
 
-fun task-handler(action : () -> <tasks,state,debug|_e> a) : <state,debug|_e> a
+fun task-handler(action : () -> <tasks|_e> a) : _e a
   with handler
     fun fetch(k)
       get(k).value.fetch-cell-val
@@ -121,7 +121,7 @@ pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
         Just(b : bool) -> b
   action()
 
-pub fun calculate-dependencies(cv : cell-val) : <exn, div | _e> list<string>
+pub fun calculate-dependencies(cv : cell-val) : <exn, div|_e> list<string>
   /*
     Using a different handler for fetch calls, 
     Given a cell value, returns the keys it is dependent to
@@ -189,26 +189,34 @@ pub effect visuals
   // Change the dimensions of the spreadsheet
   fun change-spreadsheet-dimensions(n-rows : int, n-cols : int) : ()
 
-pub fun visuals-handler(action : () -> <visuals | _e> a) : _e a
-  /*
-    Problem: Works when columns and rows are initialized with val, but not with var
-    Raises error: abstract type(s) escape(s) into the context
-    
-    var columns : list<char> := list('A', 'H').map(string)
-    var rows : list<char> := list('1', '9').map(string)
-  */
+/*
+  Problem: Works when columns and rows are initialized with val, but not with var
+  Cannot define anything with var inside the function
+  Raises error: abstract type(s) escape(s) into the context
+  
+  Does not work:
+  var columns : list<char> := list('A', 'H').map(string)
+  var rows : list<char> := list('1', '9').map(string)
+
+  Works
   val columns : list<string> = list('A', 'H').map(string)
   val rows : list<string> = list('1', '9').map(string)
+*/
+pub fun visuals-handler(action : () -> <visuals|_e> a) : _e a
+  // var columns := list('A', 'H').map(string)
+  // var rows := list('1', '9').map(string)
+  val columns = list('A', 'H').map(string)
+  val rows = list('1', '9').map(string)
+  var test-even-though-unused-still-raises-the-error := " "
   with handler
     // Prints the cell description
     fun print-cell-desc(k)
       get(k).cell-desc
     // Prints the full spreadsheet
     fun print-spreadsheet()
-      val non-empty-keys = get-nonempty-keys()
-      var out-str := "\t"
-      columns.foreach(fn (col) out-str := out-str ++ col ++ "\t")
-      out-str := out-str ++ "\n"
+      val non-empty-keys : list<string> = get-nonempty-keys()
+      // Write columns
+      var out-str := "\t" ++ columns.join("\t") ++ "\n"
       rows.foreach(fn (row) 
         out-str := out-str ++ row ++ "\t"
         columns.foreach(fn(col) 
