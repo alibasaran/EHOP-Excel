@@ -10,33 +10,30 @@ import src/interpreter
 import hashtable
 
 /*
-Below is the implementation of a "busy" build system. The term is used in Build Systems à la Carte by ANDREY MOKHOV, NEIL MITCHELL, SIMON PEYTON JONES
-meaning that the system is not minimal: 
-
-Definition 2.1 (Minimality). A build system is minimal if it executes tasks at most once per build
-and only if they transitively depend on inputs that changed since the previous build
-
-Ex. If A1 = A2 + A2 then the cell on A2 will be fetched twice, even though though in between fetchs the value of A2's dependencies did not change
+  Debugger logic, simple debugger handler which outputs a given msg into console iff debug option is True
 */
 
 pub effect debug
-  fun out(s : string) : ()
+  fun out(msg : string) : ()
 
 pub fun debug-handler(debug=False,action : () -> <debug|_e> a) : _e a
   with handler
-    fun out(s) if debug then println(s)else ()
+    fun out(msg) if debug then println(msg) else ()
   action()
 
 /*
-  Spreadsheet logic, implemented as a bucketed hash table.
+  Spreadsheet logic, implemented using a bucketed hashtable
 */
 pub struct cell
   cell-desc : string = ""
   value : cell-val = Decimal(decimal(0.0))
 
 pub effect state
+  // Set key to value cell
   fun set-key(k : string, v : cell) : () 
+  // Get the cell corresponding to k
   fun get(k : string) : cell
+  // Get all keys that are nonempty i.e that point to a cell
   fun get-nonempty-keys() : list<string>
 
 pub fun spreadsheet-handler(action : () -> <state|_e> a) : _e a
@@ -45,17 +42,16 @@ pub fun spreadsheet-handler(action : () -> <state|_e> a) : _e a
     fun set-key(k, v)
       out("SET key: " ++ k ++ ", value: " ++ v.cell-desc)
       sprsh := sprsh.set(k, v)
-    fun get-nonempty-keys()
-      sprsh.keys()
     fun get(k)
       out("GET key: " ++ k)
       match sprsh.get(k)
         Nothing -> Cell()
         Just(c : cell) -> c
+    fun get-nonempty-keys() sprsh.keys()
   action()
 
 /*
-Cell evaluation logic
+  Cell evaluation logic
 */
 pub effect tasks
   // Given a key return the value of the keys cell
@@ -89,8 +85,18 @@ pub fun fetch-cell-val-helper(cv : cell-val) : <exn, div, tasks, console> decima
   Follows dirty bit rebuilder from Build Systems a La Carte
 */
 pub effect dirty-bit
+  /*
+    Given a key string as input returns True if the key is dirty i.e the cell it points to or its dependencies have changed
+  */
   fun is-dirty(k : string) : bool
+  /*
+    Given a key string as input cleans the key
+  */
   fun clean(k : string) : ()
+  /*
+    Intermediary function that is called before the final set call.
+    Updates makes input key k dirty as well as the cells dependent to k
+  */
   fun put(k : string, v : cell) : ()
 
 pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
@@ -121,11 +127,11 @@ pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
         Just(b : bool) -> b
   action()
 
+/*
+  Calculates direct dependencies of a cell-value
+  Uses EHOP to its advantage and easily gathers dependencies by simply using a different handler
+*/
 pub fun calculate-dependencies(cv : cell-val) : <exn, div|_e> list<string>
-  /*
-    Using a different handler for fetch calls, 
-    Given a cell value, returns the keys it is dependent to
-  */
   var deps := []
   with handler
     fun fetch(k)
@@ -134,6 +140,9 @@ pub fun calculate-dependencies(cv : cell-val) : <exn, div|_e> list<string>
   fetch-cell-val-helper(cv)
   deps
 
+/*
+  Given a dependency map and a dirty key returns a list of all the keys that should be dirty
+*/
 pub fun get-keys-to-dirty(dep-map : hashtable<list<string>>, dirty-key : string) : <div, exn> list<string> 
   var res : list<string> := [dirty-key]
   match dep-map.get(dirty-key) 
@@ -144,21 +153,28 @@ pub fun get-keys-to-dirty(dep-map : hashtable<list<string>>, dirty-key : string)
 /*
   Cell building logic, optimized
 */
-
 pub effect build
+  /*
+    Highest level cell evaluation function, depending on if the input key k is dirty calls fetch
+    otherwise returns computed value of k in the previous runs
+  */
   fun eval(k : string) : decimal
 
 pub fun rebuild-handler(action : () -> <build|_e> a) : _e a
   var value-map : hashtable<decimal> := hashtable()
   with handler
     fun eval(key)
+      // If key is clean return its value directly from the value-map
       if !is-dirty(key) then 
         out(key ++ " is clean")
         match value-map.get(key)
           Nothing -> decimal(0.0)
           Just(v : decimal) -> v
+      // Else recompute the key
       else
         out(key ++ " is dirty")
+        // Use a handler where whenever a fetch is called i.e the initial key's one of the dependencies
+        // needs to be computed, only compute it iff it is dirty
         with handler
           fun fetch(k)
             if !is-dirty(k) then 
@@ -182,62 +198,46 @@ pub fun rebuild-handler(action : () -> <build|_e> a) : _e a
   Spreadsheet or cell visualization effect
 */
 pub effect visuals
-  // Print the full spreadsheet
+  // Returns the spreadsheet as a string
   fun print-spreadsheet() : string
-  // Print the description of a cell
+  // Returns the description of the cell i.e with what command it is being computed as a string
   fun print-cell-desc(k : string) : string
   // Change the dimensions of the spreadsheet
-  fun change-spreadsheet-dimensions(n-rows : int, n-cols : int) : ()
+  fun update-view-window(n-rows : int, n-cols : int) : ()
+  // Change the view pointer
+  fun update-pointer(key : string) : ()
 
-/*
-  Problem: Works when columns and rows are initialized with val, but not with var
-  Cannot define anything with var inside the function
-  Raises error: abstract type(s) escape(s) into the context
-  
-  Does not work:
-  var columns : list<char> := list('A', 'H').map(string)
-  var rows : list<char> := list('1', '9').map(string)
-
-  Works
-  val columns : list<string> = list('A', 'H').map(string)
-  val rows : list<string> = list('1', '9').map(string)
-*/
 pub fun visuals-handler(action : () -> <visuals|_e> a) : _e a
-  // var columns := list('A', 'H').map(string)
-  // var rows := list('1', '9').map(string)
-  val columns = list('A', 'H').map(string)
-  val rows = list('1', '9').map(string)
-  var test-even-though-unused-still-raises-the-error := " "
+  // Store a tuple for the window dimensions
+  var window-size := (10, 10)
+  // Store a tuple for the pointer where first value is the column and second is the row
+  var pointer-key := ("A", 1)
   with handler
     // Prints the cell description
-    fun print-cell-desc(k)
-      get(k).cell-desc
+    fun print-cell-desc(k) get(k).cell-desc
     // Prints the full spreadsheet
     fun print-spreadsheet()
-      val non-empty-keys : list<string> = get-nonempty-keys()
+      val non-empty-keys = get-nonempty-keys()
+      val rows = list(pointer-key.snd, pointer-key.snd + window-size.fst - 1).map(show)
+      val columns = list-from-keys(pointer-key.fst, (pointer-key.fst.col-to-int + window-size.snd - 1).to-key)
       // Write columns
-      var out-str := "\t" ++ columns.join("\t") ++ "\n"
-      rows.foreach(fn (row) 
-        out-str := out-str ++ row ++ "\t"
-        columns.foreach(fn(col) 
+      val header = "\t" ++ columns.join("\t") ++ "\n"
+      val body = rows.map(fn (row) row ++ "\t" ++ columns.map(fn(col) 
           val key-to-eval = col ++ row
           if non-empty-keys.index-of(fn(e) e == key-to-eval) != -1
-          then out-str := out-str ++ eval(key-to-eval).show(-3) ++ "\t"
-          else out-str := out-str ++ "-\t"
-        )
-        out-str := out-str ++ "\n"
-      )
-      out-str
-    fun change-spreadsheet-dimensions(n-rows, n-cols)
-      println(n-rows.show ++ " " ++ n-cols.show())
-      // columns := list('A', ('A'.int + n-cols).char).map(string)
-      // rows := list(1, n-cols + 1).map(fn (row-int) row-int.show())
+          then eval(key-to-eval).show(-3)
+          else "-"
+      ).join("\t"))
+      val view-details = "Window: " ++ window-size.fst.show ++ " x " ++ window-size.snd.show ++ "\t Pointer on: " ++ pointer-key.fst ++ pointer-key.snd.show
+      header ++ body.join("\n") ++ "\n" ++ view-details
+    fun update-view-window(n-rows, n-cols) window-size := (n-rows, n-cols)
+    fun update-pointer(key) pointer-key := key.separate-key()
   action()
 
+/*
+  Handle application operations by combining all of the handlers defined above 
+*/
 pub fun handle-app(action : () -> <debug,state,tasks,dirty-bit,build,visuals|_e> a, debug=False) : _e a
-  /*
-    Handle application operations by combining all of the handlers defined above 
-  */
   with debug-handler(debug)
   with spreadsheet-handler()
   with task-handler()
@@ -246,44 +246,47 @@ pub fun handle-app(action : () -> <debug,state,tasks,dirty-bit,build,visuals|_e>
   with visuals-handler()
   action()
 
+/*
+  Application logic
+  Where user input commands are handled and directed into application calls
+*/
 pub fun handle-command(command : string) : <debug,state,tasks,dirty-bit,build,visuals|_e> string
-  var res-str : string := command ++ "\n" 
-  // Seperate command handling to a separate function for simpler test code
+  var res-str : string := "\n" ++ command ++ ": "
+  // Handle exceptions by appending them to the resulting string, we do not want the application to close
   with handler
     ctl throw-exn(e)
-      res-str := e.show()
+      res-str := res-str ++ e.show()
       res-str
   match command.split(" ")
-    ["CHANGE-DIMS", n-rows-str, n-cols-str] -> {
-      val n-cols = string-to-decimal(n-cols-str).int
-      val n-rows = string-to-decimal(n-rows-str).int
+    // Assign key to a value
+    [key, "=", value] -> {key.check-key; put(key, Cell(value, tokenize-string(value)[0].unjust.interpret-token))}
+    
+    // Get cell description i.e with what command it is being computed
+    ["DESC", key] -> {key.check-key; res-str := res-str ++ print-cell-desc(key)}
+    
+    // When called, returns the value of the requested key
+    [key] -> {key.check-key; res-str := res-str ++ eval(key).show(-3) ++ "\n"}
+    
+    // Window size changing operation
+    ["WINDOW", n-rows-str, n-cols-str] -> 
+      val n-cols = n-cols-str.to-int
+      val n-rows = n-rows-str.to-int
       if n-cols < 1 || n-cols > 25
-      then println("Specified number of calls is out of the valid range: " ++ "1 < " ++ n-cols.show() ++ " < 26 is not true\n fitting specified value in the dimension range...")
-      val sanitized-n-cols = n-cols.max(1).min(25)
-      change-spreadsheet-dimensions(n-rows, n-cols)
-    }
-    // Commands that are useful for testing
-    ["DEPENDENCIES", k] -> 
-      get(k).value.calculate-dependencies.foreach(fn(dep)res-str := res-str ++ dep ++ " ")
-    // When assigning
-    [key, "=", value] -> {
-      // Check if key is valid.
-      if key.is-key
-      then {put(key, Cell(value, tokenize-string(value)[0].unjust.interpret-token))}
-      else res-str := "Invalid key format: " ++ key
-    }
-    ["DESC", key] -> res-str := print-cell-desc(key)
-    ["PRINT"] -> res-str := print-spreadsheet()
-    [key] -> if key.is-key then res-str := res-str ++ eval(key).show(-3) ++ "\n" else res-str := "Invalid key format: " ++ key
-    _ -> res-str := "Invalid input"
+      then throw("Specified number of columns is out of the valid range: " ++ "1 < " ++ n-cols-str ++ " < 26 is not true\nFitting specified value in the dimension range...")
+      if n-rows < 1
+      then throw("Specified number of rows cannot be less than 1! Changing specified number of rows into 1")
+      update-view-window(n-rows.max(1), n-cols.max(1).min(25))
+
+    // Moves the pointer to the specified key
+    ["MV-TO", key] -> {key.check-key; update-pointer(key)}
+    _ -> throw("Invalid command")
   res-str
 
 fun app() : <debug,state,tasks,dirty-bit,build,visuals|_e> ()
   // print("<App Name>$ ")
   print("\nEnter a command $ ")
   val res-str = readline().to-upper().handle-command
-  print-spreadsheet().println()
-  println(res-str)
+  println("\n" ++ print-spreadsheet() ++ "\n" ++ res-str)
   app()
 
 fun main()

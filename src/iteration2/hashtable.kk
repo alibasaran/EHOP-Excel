@@ -39,11 +39,3 @@ pub fun keys(hashtable : hashtable<a>) : _e list<string>
 pub fun bad-hash(s : string) : int
   // TODO: Find better hash implementation
   s.list.foldl(0, fn(total, elem) total + int(elem))
-
-// fun main()
-//   var table := hashtable()
-//   table := table.set("A2", 4)
-//   table := table.set("A1", 4)
-//   table := table.set("A4", 4)
-//   table := table.set("Z2", 4)
-//   table.keys.foreach(println)
