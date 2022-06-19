@@ -9,13 +9,13 @@ from math import log2, exp
 ##
 
 # filepath = "./koka_app_readability.kk"
-filepath_h = "./HaskellAppReadability.hs"
+filepath_h = "./readability-applications/HaskellAppReadability.hs"
 # How comments are done in the code
 comments_with_h = "--"
 # Processes lines after start_offset, used to skip imports
 start_offset_h = 29
 
-filepath_kk = "./koka_app_readability.kk"
+filepath_kk = "./readability-applications/koka_app_readability.kk"
 comments_with_kk = "//"
 start_offset_kk = 10
 
