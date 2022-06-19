@@ -1,8 +1,8 @@
 
 pub fun main()
-  // var vec := vector(10, 1).local-new()
-  // vec[0, 2]
-  // (vec.local-get()).foreach(println)
-  var l := list('A', 'Z')
-  l.foreach(println)
+  var str-list := ["A", "B", "C"].vector.ref()
+  str-list.modify(fn (local-vec)
+    local-vec[1, "A"]
+  )
+  str-list.foreach(println)
   

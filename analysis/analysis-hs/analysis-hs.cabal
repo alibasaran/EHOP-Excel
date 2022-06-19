@@ -1,0 +1,77 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.6.
+--
+-- see: https://github.com/sol/hpack
+
+name:           analysis-hs
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/analysis-hs#readme>
+homepage:       https://github.com/githubuser/analysis-hs#readme
+bug-reports:    https://github.com/githubuser/analysis-hs/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2022 Author name here
+license:        BSD3
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/analysis-hs
+
+library
+  exposed-modules:
+      ExcelBuild
+  other-modules:
+      Paths_analysis_hs
+  hs-source-dirs:
+      src
+  build-depends:
+      algebraic-graphs
+    , base >=4.7 && <5
+    , containers
+    , extra
+    , mtl
+    , time
+    , transformers
+  default-language: Haskell2010
+
+executable analysis-hs-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_analysis_hs
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      algebraic-graphs
+    , analysis-hs
+    , base >=4.7 && <5
+    , containers
+    , extra
+    , mtl
+    , time
+    , transformers
+  default-language: Haskell2010
+
+test-suite analysis-hs-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_analysis_hs
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-t
+  build-depends:
+      algebraic-graphs
+    , analysis-hs
+    , base >=4.7 && <5
+    , containers
+    , extra
+    , mtl
+    , time
+    , transformers
+  default-language: Haskell2010

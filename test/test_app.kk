@@ -1,6 +1,6 @@
 import std/text/regex
 // import iteration1/busy_build_system
-import iteration2/better_build_system
+import src/iteration2/better_build_system
 
 
 fun test(commands : list<string>, expected: string, test-name : string)

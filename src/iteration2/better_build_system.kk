@@ -26,9 +26,9 @@ pub fun debug-handler(debug=False,action : () -> <debug|_e> a) : _e a
 */
 pub struct cell
   cell-desc : string = ""
-  value : cell-val = Decimal(decimal(0.0))
+  task : task = Decimal(decimal(0.0))
 
-pub effect state
+pub effect store
   // Set key to value cell
   fun set-key(k : string, v : cell) : () 
   // Get the cell corresponding to k
@@ -36,7 +36,7 @@ pub effect state
   // Get all keys that are nonempty i.e that point to a cell
   fun get-nonempty-keys() : list<string>
 
-pub fun spreadsheet-handler(action : () -> <state|_e> a) : _e a
+pub fun store-handler(action:() -> <store|_e> a) : _e a
   var sprsh := hashtable()
   with handler
     fun set-key(k, v)
@@ -60,25 +60,25 @@ pub effect tasks
 fun task-handler(action : () -> <tasks|_e> a) : _e a
   with handler
     fun fetch(k)
-      get(k).value.fetch-cell-val
+      get(k).task.fetch-task
   action()
 
-pub fun fetch-cell-val(cv : cell-val) :  <exn, div, console, debug, state> decimal
+pub fun fetch-task(t : task) :  <exn, div, console, debug, store> decimal
   with task-handler()
-  fetch-cell-val-helper(cv)
+  fetch-task-helper(t)
 
-pub fun fetch-cell-val-helper(cv : cell-val) : <exn, div, tasks, console> decimal
-  match cv
+pub fun fetch-task-helper(t : task) : <exn, div, tasks, console> decimal
+  match t
     Decimal(i : decimal) -> i
-    KeyV(s : string) -> fetch(s)
-    SumV(params : list<cell-val>) -> params.foldl(decimal(0.0), fn(total, v) total + v.fetch-cell-val-helper)
-    MulV(params : list<cell-val>) -> params.foldl(decimal(1.0), fn(total, v) total * v.fetch-cell-val-helper)
-    DivV(params : list<cell-val>) -> 
-      val first-val = params.head.unjust.fetch-cell-val-helper
-      params.tail.foldl(first-val, fn(total, v) total / v.fetch-cell-val-helper)
-    MinusV(params : list<cell-val>) -> 
-      val first-val = params.head.unjust.fetch-cell-val-helper
-      params.tail.foldl(first-val, fn(total, v) total - v.fetch-cell-val-helper)
+    KeyV(key : string) -> fetch(key)
+    SumV(params : list<task>) -> params.foldl(decimal(0.0), fn(total, tsk) total + tsk.fetch-task-helper)
+    MulV(params : list<task>) -> params.foldl(decimal(1.0), fn(total, tsk) total * tsk.fetch-task-helper)
+    DivV(params : list<task>) -> 
+      val first-val = params.head.unjust.fetch-task-helper
+      params.tail.foldl(first-val, fn(total, tsk) total / tsk.fetch-task-helper)
+    MinusV(params : list<task>) -> 
+      val first-val = params.head.unjust.fetch-task-helper
+      params.tail.foldl(first-val, fn(total, tsk) total - tsk.fetch-task-helper)
 
 /*
   Cell rebuilding logic
@@ -90,14 +90,14 @@ pub effect dirty-bit
   */
   fun is-dirty(k : string) : bool
   /*
-    Given a key string as input cleans the key
+    Given a key as input cleans the key's cell
   */
   fun clean(k : string) : ()
   /*
     Intermediary function that is called before the final set call.
-    Updates makes input key k dirty as well as the cells dependent to k
+    Makes input key k dirty as well as the cells dependent to k
   */
-  fun put(k : string, v : cell) : ()
+  fun put(k : string, desc : string) : ()
 
 pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
   // A map that maps a key to its dependents.
@@ -106,8 +106,10 @@ pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
   // A map that given a key returns true if dirty false otherwise
   var is-dirty-map : hashtable<bool> := hashtable()
   with handler
-    fun put(k, v)
-      v.value.calculate-dependencies.foreach(fn (dep)
+    fun put(k, desc)
+      // Convert the value from string to cell
+      val cell = Cell(desc, tokenize-string(desc)[0].unjust.interpret-token)
+      cell.task.calculate-dependencies.foreach(fn (dep)
         match dep-map.get(dep)
           // If initial entry of dep
           Nothing -> dep-map := dep-map.set(dep, [k])
@@ -117,7 +119,7 @@ pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
       // Dirty all cells dependent to k T as well as k
       dep-map.get-keys-to-dirty(k).foreach(fn (dk) is-dirty-map := is-dirty-map.set(dk, True))
       // Put k,v pair into the spreadsheet
-      set-key(k, v)
+      set-key(k, cell)
     fun clean(k)
       is-dirty-map := is-dirty-map.set(k, False)
     fun is-dirty(k) 
@@ -128,16 +130,16 @@ pub fun dirty-bit-handler(action : () -> <dirty-bit|_e> a) : _e a
   action()
 
 /*
-  Calculates direct dependencies of a cell-value
+  Calculates direct dependencies of a task
   Uses EHOP to its advantage and easily gathers dependencies by simply using a different handler
 */
-pub fun calculate-dependencies(cv : cell-val) : <exn, div|_e> list<string>
+pub fun calculate-dependencies(t : task) : <exn, div|_e> list<string>
   var deps := []
   with handler
     fun fetch(k)
       deps := deps ++ [k] 
       decimal(1.0)
-  fetch-cell-val-helper(cv)
+  t.fetch-task-helper
   deps
 
 /*
@@ -160,7 +162,7 @@ pub effect build
   */
   fun eval(k : string) : decimal
 
-pub fun rebuild-handler(action : () -> <build|_e> a) : _e a
+pub fun build-handler(action : () -> <build|_e> a) : _e a
   var value-map : hashtable<decimal> := hashtable()
   with handler
     fun eval(key)
@@ -187,7 +189,7 @@ pub fun rebuild-handler(action : () -> <build|_e> a) : _e a
               value-map := value-map.set(k, res)
               clean(k)
               res
-        val res = get(key).value.fetch-cell-val-helper
+        val res = get(key).task.fetch-task-helper
         out("FETCH key: " ++ key ++ " result " ++ res.show())
         clean(key)
         value-map := value-map.set(key, res)
@@ -237,12 +239,12 @@ pub fun visuals-handler(action : () -> <visuals|_e> a) : _e a
 /*
   Handle application operations by combining all of the handlers defined above 
 */
-pub fun handle-app(action : () -> <debug,state,tasks,dirty-bit,build,visuals|_e> a, debug=False) : _e a
+pub fun handle-app(action : () -> <debug,store,tasks,dirty-bit,build,visuals|_e> a, debug=False) : <console|_e> a
   with debug-handler(debug)
-  with spreadsheet-handler()
+  with store-handler()
   with task-handler()
   with dirty-bit-handler()
-  with rebuild-handler()
+  with build-handler()
   with visuals-handler()
   action()
 
@@ -250,7 +252,7 @@ pub fun handle-app(action : () -> <debug,state,tasks,dirty-bit,build,visuals|_e>
   Application logic
   Where user input commands are handled and directed into application calls
 */
-pub fun handle-command(command : string) : <debug,state,tasks,dirty-bit,build,visuals|_e> string
+pub fun handle-command(command : string) : <debug,store,tasks,dirty-bit,build,visuals|_e> string
   var res-str : string := "\n" ++ command ++ ": "
   // Handle exceptions by appending them to the resulting string, we do not want the application to close
   with handler
@@ -259,7 +261,7 @@ pub fun handle-command(command : string) : <debug,state,tasks,dirty-bit,build,vi
       res-str
   match command.split(" ")
     // Assign key to a value
-    [key, "=", value] -> {key.check-key; put(key, Cell(value, tokenize-string(value)[0].unjust.interpret-token))}
+    [key, "=", value] -> {key.check-key; put(key, value)}
     
     // Get cell description i.e with what command it is being computed
     ["DESC", key] -> {key.check-key; res-str := res-str ++ print-cell-desc(key)}
@@ -282,8 +284,7 @@ pub fun handle-command(command : string) : <debug,state,tasks,dirty-bit,build,vi
     _ -> throw("Invalid command")
   res-str
 
-fun app() : <debug,state,tasks,dirty-bit,build,visuals|_e> ()
-  // print("<App Name>$ ")
+fun app() : <debug,store,tasks,dirty-bit,build,visuals|_e> ()
   print("\nEnter a command $ ")
   val res-str = readline().to-upper().handle-command
   println("\n" ++ print-spreadsheet() ++ "\n" ++ res-str)

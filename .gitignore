@@ -1,2 +1,4 @@
 .koka
 redundant
+.DS_Store
+analysis/analysis-hs/.stack-work

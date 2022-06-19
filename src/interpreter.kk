@@ -2,15 +2,15 @@ module interpreter
 import tokenizer
 import std/num/decimal
 
-pub type cell-val
+pub type task
   Decimal(i : decimal)
   KeyV(s : string)
-  SumV(params : list<cell-val>)
-  MulV(params : list<cell-val>)
-  MinusV(params : list<cell-val>)
-  DivV(params : list<cell-val>)
+  SumV(params : list<task>)
+  MulV(params : list<task>)
+  MinusV(params : list<task>)
+  DivV(params : list<task>)
 
-pub fun interpret-token(t : token) : <exn,div> cell-val
+pub fun interpret-token(t : token) : <exn,div> task
   match t
     Key(k: string) -> KeyV(k)
     Number(n: decimal) -> Decimal(n)
